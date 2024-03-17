@@ -7,50 +7,59 @@ import matplotlib.pyplot as plt
 #covariance matrix
 Q = np.diag([1, #var(x)
              1, #var(y)
-             np.deg2rad(1.0), #var(yaw)
+             np.deg2rad(1), #var(yaw)
+             1  #var(velocity)
              ])**2
-R = np.diag([1,1,1])**2
+
+R = np.diag([1,1])**2
 
 #noise parameter
-input_noise = np.diag([1.0,np.deg2rad(5)])**2
+input_noise = np.diag([1.0,np.deg2rad(30)])**2
 
 #measurement matrix
-H = np.diag([1,1,1])**2
+H = np.array([[1,0,0,0],
+              [0,1,0,0]])
 
 dt = 0.1 # time-step
 
-SIM_TIME = 50.0 #simulation time
-
 show_animation = True
 
-def calc_input():
-    v = 1.0
-    a = 0.1
-    u = np.array([[v],[a]]) #control input
 
-    return u
-
-def observation(xTrue, xd, u):
+def observation(xTrue, u):
     xTrue = state_model(xTrue, u)
 
     #adding noise to input
     ud = u + input_noise @ np.random.randn(2,1)
 
-    xd = state_model(xd, ud)
-
-    return xTrue, xd, ud
+    return xTrue, ud
 
 def state_model(x, u):
 
-   A = np.diag([1,1,1])**2
+   A = np.array([[1,0,0,0],
+                 [0,1,0,0],
+                 [0,0,1,0],
+                 [0,0,0,0]])
 
    B = np.array([[dt * math.cos(x[2,0]), 0],
                  [dt * math.sin(x[2,0]), 0],
-                 [0, dt]])
+                 [0, dt],
+                 [1,0]])
     
    x = A @ x + B @ u
 
    return x
+
+def jacob_f(x, u):
+
+    yaw = x[2, 0]
+    v = u[0, 0]
+    jF = np.array([
+        [1.0, 0.0, -dt * v * math.sin(yaw), dt * math.cos(yaw)],
+        [0.0, 1.0, dt * v * math.cos(yaw), dt * math.sin(yaw)],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]])
+
+    return jF
 
 def observation_model(x):
 
@@ -63,8 +72,8 @@ def ekf_estimation(xEst, PEst, z, u):
     #Predict 
     xPred = state_model(xEst, u)
     #state covariance
-    F = np.diag([1,1,1])**2
-    PPred = F*PEst*F.T + Q
+    jF = jacob_f(xEst, u)
+    PPred = jF*PEst*jF.T + Q
 
     #Update
     zPred = observation_model(xPred)
@@ -77,35 +86,30 @@ def ekf_estimation(xEst, PEst, z, u):
 
     xEst = xPred + K @ y #updating state
 
-    PEst = ((np.eye(3)) - K@H) @ PPred
+    PEst = ((np.eye(len(xEst))) - K@H) @ PPred
 
     return xEst, PEst
-
 
 def main():
 
     time = 0.0
 
     #state vector 
-    xEst = np.zeros((3,1))
-    xTrue = np.zeros((3,1))
-    PEst = np.array([[0.1,0,0],[0,0.1,0],[0,0,0.1]])
+    xEst = np.zeros((4,1))
+    xTrue = np.zeros((4,1))
+    PEst = np.eye(4)
     
-    xDR = np.zeros((3,1)) #dead reckoning
-
     #history
     hxEst = xEst
     hxTrue = xTrue 
-    hxDR = xTrue 
-    hz = np.zeros((3,1)) 
 
-    while SIM_TIME>=time:
+    while True:
+
+        u = np.array() #control input
         
         time+= dt
 
-        u = calc_input()
-
-        xTrue, XDR, ud = observation(xTrue, xDR, u)
+        xTrue, ud = observation(xTrue, u)
 
         z = observation_model(xTrue)
 
@@ -114,27 +118,22 @@ def main():
         #store data histroy 
         hxEst = np.hstack((hxEst, xEst))
         hxTrue = np.hstack((hxTrue, xTrue))
-        hxDR = np.hstack((hxDR, xDR))
-        hz = np.hstack((hz,z))
+        
         if show_animation:
             plt.cla()
+            
             # for stopping simulation with the esc key.
             plt.gcf().canvas.mpl_connect('key_release_event',
                     lambda event: [exit(0) if event.key == 'escape' else None])
-            plt.plot(hz[0, :], hz[1, :], ".g")
-            plt.plot(hxTrue[0, :].flatten(),
-                     hxTrue[1, :].flatten(), "-b")
-            plt.plot(hxDR[0, :].flatten(),
-                     hxDR[1, :].flatten(), "-k")
-            plt.plot(hxEst[0, :].flatten(),
-                     hxEst[1, :].flatten(), "-r")
-
-            """
-            plt.text(0.45, 0.85, f"True Velocity Scale Factor: {true_scale_factor:.2f}", ha='left', va='top', transform=plt.gca().transAxes)
-           plt.text(0.45, 0.95, f"Estimated Velocity Scale Factor: {estimated_scale_factor:.2f}", ha='left', va='top', transform=plt.gca().transAxes)
-            """
-
+            
+            #plotting actual state (represented by blue line)
+            plt.plot(hxTrue[0, :], hxTrue[1, :], "-b")
+            
+            #plotting estimated state (represented by red line)
+            plt.plot(hxEst[0, :], hxEst[1, :], "-r")
+            
             plot.plot_covariance_ellipse(xEst[0, 0], xEst[1, 0], PEst)
+            
             plt.axis("equal")
             plt.grid(True)
             plt.pause(0.001)
