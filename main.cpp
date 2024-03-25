@@ -4,11 +4,14 @@
 #include<stack>
 #include<tuple>
 #include<matplotlibcpp.h>
-
+#include <SerialStream.h> 
+using namespace std;
+using namespace LibSerial;
 namespace plt = matplotlibcpp;
 using namespace std;
 using namespace Eigen;
-	
+
+const int ARRAY_SIZE = 100;	
 class EKF
 {
 	public:
@@ -146,9 +149,23 @@ int main()
 
 	while (true)
 	{
-		
-		Matrix<float,1,3> accel = {};
-		Matrix<float,1,3> gyro = {};
+	    // Read accelerometer data from Arduino
+   	    vector<vector<float>> accelerometerData;
+   	    for (int i = 0; i < ARRAY_SIZE; ++i) {
+       	     string line;
+             getline(arduinoSerial, line);
+             accelerometerData.push_back(parseArray(line));
+        }
+
+            // Read gyroscope data from Arduino
+            vector<vector<float>> gyroscopeData;
+            for (int i = 0; i < ARRAY_SIZE; ++i) {
+            string line;
+            getline(arduinoSerial, line);
+            gyroscopeData.push_back(parseArray(line));
+        }
+		Matrix<float,1,3> accel = {raw_accel.x, raw_accel.y, raw_accel.z};
+		Matrix<float,1,3> gyro = {raw_gyro.x, raw_gyro.y, raw_gyro.z};
 		
 		//calculating net acceleration
 		float accel_net = sqrt((pow(accel(0), 2) + pow(accel(1), 2)));
