@@ -1,15 +1,11 @@
 #include<stdlib.h>
 #include<cmath>
-#include<opencv4/opencv2/opencv.hpp>
-#include<opencv4/opencv2/core/core.hpp>
-#include<opencv4/opencv2/highgui/highgui.hpp>
 #include<Eigen/Dense>
-#include<librealsense2/h/rs_sensor.h>
-#include<librealsense2/hpp/rs_pipeline.hpp>
 #include<stack>
 #include<tuple>
+#include<matplotlibcpp.h>
 
-//namespace plt = matplotlibcpp;
+namespace plt = matplotlibcpp;
 using namespace std;
 using namespace Eigen;
 	
